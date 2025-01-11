@@ -1,0 +1,112 @@
+from flask import Flask, jsonify, request
+
+app = Flask(__name__)
+
+# Mock data for properties
+properties = [
+    {
+        "property_id": 1,
+        "location": "Mumbai",
+        "price": 750000,
+        "is_available": True
+    },
+    {
+        "property_id": 2,
+        "location": "Delhi",
+        "price": 1200000,
+        "is_available": True
+    }
+]
+
+# Mock data for clients
+clients = [
+    {
+        "client_id": 1,
+        "name": "John Doe",
+        "contact": "9876543210"
+    },
+    {
+        "client_id": 2,
+        "name": "Jane Smith",
+        "contact": "9123456789"
+    }
+]
+
+# Mock data for agents
+agents = [
+    {
+        "agent_id": 1,
+        "name": "Agent A",
+        "commission_rate": 0.05
+    },
+    {
+        "agent_id": 2,
+        "name": "Agent B",
+        "commission_rate": 0.03
+    }
+]
+
+# Mock data for transactions
+transactions = []
+
+# Route to get all properties
+@app.route('/properties', methods=['GET'])
+def get_properties():
+    return jsonify(properties)
+
+# Route to search properties based on filters
+@app.route('/properties/search', methods=['GET'])
+def search_properties():
+    location = request.args.get('location')
+    min_price = float(request.args.get('min_price', 0))
+    max_price = float(request.args.get('max_price', float('inf')))
+    available_properties = [
+        property for property in properties
+        if property["is_available"]
+        and property["location"].lower() == location.lower()
+        and min_price <= property["price"] <= max_price
+    ]
+    return jsonify(available_properties)
+
+# Route to reserve a property
+@app.route('/transactions', methods=['POST'])
+def create_transaction():
+    data = request.json
+    property_id = data.get("property_id")
+    client_id = data.get("client_id")
+    agent_id = data.get("agent_id")
+    sale_price = data.get("sale_price")
+
+    # Check property availability
+    for property in properties:
+        if property["property_id"] == property_id and property["is_available"]:
+            # Reserve property
+            property["is_available"] = False
+            transaction = {
+                "transaction_id": len(transactions) + 1,
+                "property_id": property_id,
+                "client_id": client_id,
+                "agent_id": agent_id,
+                "sale_price": sale_price
+            }
+            transactions.append(transaction)
+            return jsonify({"status": "success", "message": "Transaction completed successfully!"})
+    return jsonify({"status": "failure", "message": "Property not available or invalid property ID."})
+
+# Route to calculate agent's total commission
+@app.route('/agents/<int:agent_id>/commission', methods=['GET'])
+def calculate_commission(agent_id):
+    total_commission = 0
+    for transaction in transactions:
+        if transaction["agent_id"] == agent_id:
+            agent = next(agent for agent in agents if agent["agent_id"] == agent_id)
+            total_commission += transaction["sale_price"] * agent["commission_rate"]
+    return jsonify({"agent_id": agent_id, "total_commission": total_commission})
+
+# Route to get all transactions
+@app.route('/transactions', methods=['GET'])
+def get_transactions():
+    return jsonify(transactions)
+
+if __name__ == '__main__':
+    app.run(debug=True)
